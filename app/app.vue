@@ -49,7 +49,7 @@ const convert = async () => {
 
     const filename = file.value.name.replace(/\.[^/.]+$/, '')
     const ext = conversionType.value === 'icns' ? '.icns' : '-icons.zip'
-    downloadBlob(response as Blob, `${filename}${ext}`)
+    downloadBlob(response as unknown as Blob, `${filename}${ext}`)
   } catch (e: any) {
     error.value = e.message || '转换失败，请重试'
   } finally {
