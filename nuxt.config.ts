@@ -9,6 +9,9 @@ export default defineNuxtConfig({
     }
   },
   vite: {
+    define: {
+      'global': 'window',
+    },
     optimizeDeps: {
       include: ['buffer', 'png2icons']
     }

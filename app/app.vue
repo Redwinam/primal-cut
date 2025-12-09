@@ -121,7 +121,9 @@ const convert = async () => {
       // 2. Convert to ICNS using png2icons
       // Fix: png2icons relies on UZIP global in browser environment
       if (typeof window !== 'undefined') {
-        (window as any).UZIP = UZIP
+        (window as any).UZIP = UZIP;
+        (window as any).Buffer = Buffer;
+        (window as any).global = window;
       }
       const png2icons = await import('png2icons')
       
