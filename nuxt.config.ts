@@ -7,5 +7,13 @@ export default defineNuxtConfig({
     head: {
       title: '素裁'
     }
+  },
+  nitro: {
+    esbuild: {
+      options: {
+        target: 'esnext',
+      },
+    },
+    moduleSideEffects: ['sharp'],
   }
 })
