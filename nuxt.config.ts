@@ -13,7 +13,6 @@ export default defineNuxtConfig({
       options: {
         target: 'esnext',
       },
-    },
-    moduleSideEffects: ['sharp'],
+    }
   }
 })
