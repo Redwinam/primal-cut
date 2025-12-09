@@ -8,11 +8,9 @@ export default defineNuxtConfig({
       title: '素裁'
     }
   },
-  nitro: {
-    esbuild: {
-      options: {
-        target: 'esnext',
-      },
+  vite: {
+    optimizeDeps: {
+      include: ['buffer', 'png2icons']
     }
   }
 })

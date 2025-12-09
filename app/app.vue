@@ -3,6 +3,9 @@ import { ref } from 'vue'
 import { UploadCloud, FileImage, Download, Loader2, AlertCircle, X } from 'lucide-vue-next'
 import { downloadBlob } from '../utils/file'
 import '../assets/css/main.css'
+import * as png2icons from 'png2icons'
+import JSZip from 'jszip'
+import { Buffer } from 'buffer'
 
 const file = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -30,27 +33,120 @@ const handleFileSelect = (e: Event) => {
   }
 }
 
+// Helper: Process image using Canvas API (lighter than Jimp)
+const processImageForIcns = async (file: File): Promise<Buffer> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      // 1. Create canvas 1264x1264 (1024 + padding)
+      const canvas = document.createElement('canvas')
+      canvas.width = 1264
+      canvas.height = 1264
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Canvas context not available'))
+        return
+      }
+
+      // 2. Draw image centered (1024x1024) with padding (120px)
+      // The image should be resized to fit within 1024x1024
+      const scale = Math.min(1024 / img.width, 1024 / img.height)
+      const w = img.width * scale
+      const h = img.height * scale
+      const x = 120 + (1024 - w) / 2
+      const y = 120 + (1024 - h) / 2
+
+      ctx.drawImage(img, x, y, w, h)
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          reject(new Error('Canvas to Blob failed'))
+          return
+        }
+        const arrayBuffer = await blob.arrayBuffer()
+        resolve(Buffer.from(arrayBuffer))
+      }, 'image/png')
+    }
+    img.onerror = reject
+    img.src = URL.createObjectURL(file)
+  })
+}
+
+const processImageResize = async (file: File, size: number): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Canvas context not available'))
+        return
+      }
+
+      // Contain fit
+      const scale = Math.min(size / img.width, size / img.height)
+      const w = img.width * scale
+      const h = img.height * scale
+      const x = (size - w) / 2
+      const y = (size - h) / 2
+
+      ctx.drawImage(img, x, y, w, h)
+
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob)
+        else reject(new Error('Resize failed'))
+      }, 'image/png')
+    }
+    img.onerror = reject
+    img.src = URL.createObjectURL(file)
+  })
+}
+
 const convert = async () => {
   if (!file.value) return
 
   isConverting.value = true
   error.value = null
 
-  const formData = new FormData()
-  formData.append('file', file.value)
-  formData.append('type', conversionType.value)
-
   try {
-    const response = await $fetch('/api/convert', {
-      method: 'POST',
-      body: formData,
-      responseType: 'blob'
-    })
-
     const filename = file.value.name.replace(/\.[^/.]+$/, '')
-    const ext = conversionType.value === 'icns' ? '.icns' : '-icons.zip'
-    downloadBlob(response as unknown as Blob, `${filename}${ext}`)
+
+    if (conversionType.value === 'icns') {
+      // 1. Process image (resize & padding)
+      const processedBuffer = await processImageForIcns(file.value)
+      
+      // 2. Convert to ICNS using png2icons
+      // Note: This is synchronous and might freeze UI for a moment on large files
+      // Ideally should be in a Web Worker, but for simplicity we run it here
+      const icnsBuffer = png2icons.createICNS(processedBuffer, png2icons.BILINEAR, 0)
+      
+      if (!icnsBuffer) {
+        throw new Error('生成 ICNS 失败')
+      }
+
+      const blob = new Blob([icnsBuffer as unknown as BlobPart], { type: 'application/x-icns' })
+      downloadBlob(blob, `${filename}.icns`)
+
+    } else if (conversionType.value === 'png-set') {
+      const zip = new JSZip()
+      const sizes = [16, 48, 128]
+
+      // Add original
+      zip.file('icon.png', file.value)
+
+      // Add resized
+      for (const size of sizes) {
+        const resizedBlob = await processImageResize(file.value, size)
+        zip.file(`icon${size}.png`, resizedBlob)
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      downloadBlob(zipBlob, `${filename}-icons.zip`)
+    }
   } catch (e: any) {
+    console.error(e)
     error.value = e.message || '转换失败，请重试'
   } finally {
     isConverting.value = false
