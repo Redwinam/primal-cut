@@ -3,9 +3,10 @@ import { ref } from 'vue'
 import { UploadCloud, FileImage, Download, Loader2, AlertCircle, X } from 'lucide-vue-next'
 import { downloadBlob } from '../utils/file'
 import '../assets/css/main.css'
-import * as png2icons from 'png2icons'
 import JSZip from 'jszip'
 import { Buffer } from 'buffer'
+// @ts-ignore
+import UZIP from 'png2icons/lib/UZIP'
 
 const file = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -118,6 +119,12 @@ const convert = async () => {
       const processedBuffer = await processImageForIcns(file.value)
       
       // 2. Convert to ICNS using png2icons
+      // Fix: png2icons relies on UZIP global in browser environment
+      if (typeof window !== 'undefined') {
+        (window as any).UZIP = UZIP
+      }
+      const png2icons = await import('png2icons')
+      
       // Note: This is synchronous and might freeze UI for a moment on large files
       // Ideally should be in a Web Worker, but for simplicity we run it here
       const icnsBuffer = png2icons.createICNS(processedBuffer, png2icons.BILINEAR, 0)
