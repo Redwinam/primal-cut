@@ -57,7 +57,21 @@ const processImageForIcns = async (file: File): Promise<Buffer> => {
       const x = 120 + (1024 - w) / 2
       const y = 120 + (1024 - h) / 2
 
+      // Apply rounded corners (macOS style)
+      ctx.save()
+      ctx.beginPath()
+      // Use 22.37% of the size for radius, which matches macOS Big Sur+ style
+      const r = Math.min(w, h) * 0.2237
+      ctx.moveTo(x + r, y)
+      ctx.arcTo(x + w, y, x + w, y + h, r)
+      ctx.arcTo(x + w, y + h, x, y + h, r)
+      ctx.arcTo(x, y + h, x, y, r)
+      ctx.arcTo(x, y, x + w, y, r)
+      ctx.closePath()
+      ctx.clip()
+
       ctx.drawImage(img, x, y, w, h)
+      ctx.restore()
 
       canvas.toBlob(async (blob) => {
         if (!blob) {
