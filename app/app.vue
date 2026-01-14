@@ -57,8 +57,13 @@ const processImageForIcns = async (file: File): Promise<Buffer> => {
       const x = 120 + (1024 - w) / 2
       const y = 120 + (1024 - h) / 2
 
-      // Apply rounded corners (macOS style)
-      ctx.save()
+      // Draw the image first
+      ctx.drawImage(img, x, y, w, h)
+
+      // Apply rounded corners (macOS style) using composite operation
+      // This provides smoother edges than ctx.clip() and avoids dark halos
+      ctx.globalCompositeOperation = 'destination-in'
+      
       ctx.beginPath()
       // Use 22.37% of the size for radius, which matches macOS Big Sur+ style
       const r = Math.min(w, h) * 0.2237
@@ -68,10 +73,11 @@ const processImageForIcns = async (file: File): Promise<Buffer> => {
       ctx.arcTo(x, y + h, x, y, r)
       ctx.arcTo(x, y, x + w, y, r)
       ctx.closePath()
-      ctx.clip()
-
-      ctx.drawImage(img, x, y, w, h)
-      ctx.restore()
+      ctx.fillStyle = '#000000' // Color doesn't matter for destination-in, only alpha
+      ctx.fill()
+      
+      // Reset composite operation
+      ctx.globalCompositeOperation = 'source-over'
 
       canvas.toBlob(async (blob) => {
         if (!blob) {
@@ -143,7 +149,7 @@ const convert = async () => {
       
       // Note: This is synchronous and might freeze UI for a moment on large files
       // Ideally should be in a Web Worker, but for simplicity we run it here
-      const icnsBuffer = png2icons.createICNS(processedBuffer, png2icons.BILINEAR, 0)
+      const icnsBuffer = png2icons.createICNS(processedBuffer, png2icons.BICUBIC, 0)
       
       if (!icnsBuffer) {
         throw new Error('生成 ICNS 失败')
